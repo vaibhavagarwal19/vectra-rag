@@ -1,0 +1,16 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: vectra_pgvector
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: vectra
+      POSTGRES_PASSWORD: vectra
+      POSTGRES_DB: vectra_rag
+    ports:
+      - "5433:5432"
+    volumes:
+      - vectra_pgdata:/var/lib/postgresql/data
+
+volumes:
+  vectra_pgdata:

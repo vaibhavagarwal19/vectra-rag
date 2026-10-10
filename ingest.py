@@ -65,7 +65,7 @@ def embed_texts(client: OpenAI, texts: list[str]) -> list[list[float]]:
     return [d.embedding for d in resp.data]
 
 
-def ingest_all(kb_dir: str = None, wipe_first: bool = True) -> dict:
+def ingest_all(kb_dir: str | None = None, wipe_first: bool = True) -> dict:
     """Ingest every KB-*.md file in kb_dir. Returns a small summary dict."""
     kb_dir = kb_dir or config.KB_DIR
     client = OpenAI(api_key=config.OPENAI_API_KEY)
@@ -73,7 +73,7 @@ def ingest_all(kb_dir: str = None, wipe_first: bool = True) -> dict:
     if wipe_first:
         db.clear_all()
 
-    summary = {"files": 0, "chunks": 0, "skipped": []}
+    summary: dict[str, int | list[str]] = {"files": 0, "chunks": 0, "skipped": []}
     paths = sorted(glob.glob(os.path.join(kb_dir, "KB-*.md")))
 
     rows = []
@@ -106,26 +106,25 @@ def ingest_all(kb_dir: str = None, wipe_first: bool = True) -> dict:
 
     embeddings = embed_texts(client, [r["chunk_text"] for r in rows])
 
-    with db.get_conn() as conn:
-        with conn.cursor() as cur:
-            for row, emb in zip(rows, embeddings):
-                cur.execute(
-                    """
-                    INSERT INTO kb_chunks
-                        (doc_id, title, status, effective_date, superseded_by, section, chunk_text, embedding)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                    """,
-                    (
-                        row["doc_id"],
-                        row["title"],
-                        row["status"],
-                        row["effective_date"],
-                        row["superseded_by"],
-                        row["section"],
-                        row["chunk_text"],
-                        emb,
-                    ),
-                )
+    with db.get_conn() as conn, conn.cursor() as cur:
+        for row, emb in zip(rows, embeddings):
+            cur.execute(
+                """
+                INSERT INTO kb_chunks
+                    (doc_id, title, status, effective_date, superseded_by, section, chunk_text, embedding)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    row["doc_id"],
+                    row["title"],
+                    row["status"],
+                    row["effective_date"],
+                    row["superseded_by"],
+                    row["section"],
+                    row["chunk_text"],
+                    emb,
+                ),
+            )
     summary["chunks"] = len(rows)
     return summary
 

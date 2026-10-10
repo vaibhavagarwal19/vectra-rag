@@ -2,16 +2,15 @@
 
 Chunking strategy:
   - Each file starts with a YAML front-matter block: doc_id, title, status,
-    effective_date, and optionally superseded_by.
+    effective_date.
   - The body is split on level-2 headings ("## ..."). Each section becomes one
     chunk. This keeps the priority table in KB-003 and the error-code table in
     KB-007 intact -- a size-based splitter could cut either in half.
   - All 9 articles are short, so if a file has no "## " headings at all
     (e.g. KB-003), the whole body becomes a single chunk.
-  - Every chunk carries doc_id/title/status/effective_date/superseded_by as
-    metadata columns, not just as text, so queries can filter
-    (e.g. status = 'current') instead of relying on the model to notice a
-    "deprecated" banner in the text.
+  - Every chunk carries doc_id/title/status/effective_date as metadata columns,
+    not just as text, so queries can filter (e.g. status = 'current') instead
+    of relying on the model to notice a "deprecated" banner in the text.
 """
 import glob
 import os
@@ -94,7 +93,6 @@ def ingest_all(kb_dir: str | None = None, wipe_first: bool = True) -> dict:
                     "title": meta.get("title", doc_id),
                     "status": status,
                     "effective_date": meta.get("effective_date"),
-                    "superseded_by": meta.get("superseded_by"),
                     "section": heading,
                     "chunk_text": text,
                 }
@@ -111,15 +109,14 @@ def ingest_all(kb_dir: str | None = None, wipe_first: bool = True) -> dict:
             cur.execute(
                 """
                 INSERT INTO kb_chunks
-                    (doc_id, title, status, effective_date, superseded_by, section, chunk_text, embedding)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    (doc_id, title, status, effective_date, section, chunk_text, embedding)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
                 """,
                 (
                     row["doc_id"],
                     row["title"],
                     row["status"],
                     row["effective_date"],
-                    row["superseded_by"],
                     row["section"],
                     row["chunk_text"],
                     emb,

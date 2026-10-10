@@ -45,7 +45,7 @@ Each KB file has a YAML front-matter block (`doc_id`, `title`, `status`,
   slice through the middle of KB-003's priority/SLA table or KB-007's error-code
   table. Splitting on headings keeps both intact, because each table lives entirely
   inside one section.
-- `doc_id`, `title`, `status`, `effective_date`, `superseded_by` are stored as real
+- `doc_id`, `title`, `status`, `effective_date` are stored as real
   **columns** on every chunk row, not just left inside the text. That's what lets
   retrieval filter `WHERE status = 'current'` instead of relying on the model to
   notice a "deprecated" note in the prose.

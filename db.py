@@ -21,7 +21,6 @@ CREATE TABLE IF NOT EXISTS kb_chunks (
     title TEXT NOT NULL,
     status TEXT NOT NULL,
     effective_date DATE,
-    superseded_by TEXT,
     section TEXT,
     chunk_text TEXT NOT NULL,
     embedding VECTOR({config.EMBED_DIM}) NOT NULL

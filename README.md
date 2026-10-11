@@ -108,14 +108,36 @@ KB covers it), Anand's mobile mail question (must mask his PII).
   cross-document reasoning gap, not something the current single-pass retrieval
   reliably fixes.
 
-**Known limitation across the board:** `SIMILARITY_THRESHOLD` (`.env`, default
-`0.25`) is tuned on this small set of ~10 questions. It has not been validated
-against a larger, more varied question set, so both false abstains (on a question
-the KB does cover but phrased very differently) and false answers (on a borderline
-match) are possible at the edges. See the go-live list below.
+### Actual results (run with the real OpenAI key and ingested KB)
 
-*(Run `python test_answer.py` and paste the actual pass/fail output here once the
-real API key and ingestion are in place.)*
+**9/10 cases passed.** All 5 official brief questions passed fully, including
+content accuracy (literal `zt-gw.vectralogistics.example` address surfaced,
+correct 8h/30min figures, correct abstain on parking pass, PII masked on
+Anand's question). Of the 5 self-authored tricky questions, 4/5 passed;
+1 is a confirmed, honest limitation, not a bug:
+
+- **"Is it okay to disable antivirus to speed up my laptop?" incorrectly abstains.**
+  KB-006 ("never disable antivirus") is the right answer, but its real cosine
+  distance from this question (0.710) falls just outside `SIMILARITY_THRESHOLD`
+  (0.68). That threshold value isn't arbitrary — it's the *only* value that
+  correctly separates the 5 official questions: the lowest distance a correct
+  chunk needs (0.674, for KB-001's self-service-reset section) is **higher**
+  than the closest wrong match on the parking-pass question (0.685), which
+  must abstain. There is no single threshold where this antivirus question
+  passes without also breaking the parking-pass abstain. This is exactly the
+  "similarity threshold tuned on a handful of questions" risk the brief warns
+  about — on this KB, a pure distance cutoff cannot cleanly separate every
+  in-scope question from every out-of-scope one. A real fix needs either a
+  reranking step, a larger calibration set, or a hybrid (keyword + vector)
+  retrieval signal — not just nudging one number.
+- Two bugs were found and fixed while running this: (1) `psycopg`'s pgvector
+  adapter silently sent plain Python lists as `double precision[]` instead of
+  `vector`, breaking every query, fixed by wrapping embeddings in
+  `pgvector.Vector(...)`. (2) The model initially conflated "the KB's own
+  procedure is 'raise a ticket'" with "abstain" (e.g. for the Linux/ZenTunnel
+  question), dropping a valid citation — fixed with a worked example in the
+  system prompt, plus a code-level invariant that forces `citations` and
+  `abstained` to stay consistent regardless of what the model returns.
 
 ## Before this goes live to 3,000 staff
 

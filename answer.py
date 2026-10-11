@@ -19,6 +19,7 @@ Pipeline:
 import json
 
 from openai import OpenAI
+from pgvector import Vector
 
 import config
 import db
@@ -29,10 +30,29 @@ SYSTEM_PROMPT = """You are Vectra Logistics' IT help-desk assistant.
 Rules, no exceptions:
 - Answer ONLY using the KB_CONTEXT provided below. Never use outside knowledge.
 - Every claim in your answer must trace back to one of the provided chunks.
-- If the context does not fully answer the question, set "abstained": true,
-  write an answer that tells the employee to raise a ticket, and return an
-  empty citations list. Do not guess, do not partially answer, do not invent
-  a process, URL, or policy that is not in the context.
+- Include concrete details verbatim when the context has them -- exact URLs,
+  server addresses, error codes, phone extensions, and time figures (e.g. both
+  a first-response time AND a resolution time if both are given). Do not
+  paraphrase a specific value away into a vague description.
+- KB_CONTEXT has already been pre-filtered for relevance before it reaches
+  you. So "abstained" should almost always be false. Only set "abstained":
+  true if KB_CONTEXT is clearly about a different topic than the question
+  and genuinely does not address it at all.
+- Important: the KB's own documented procedure is often "raise a ticket with
+  team X" or "this isn't supported, contact team Y" -- that is still a
+  complete, sourced answer, NOT an abstain, as long as it comes from
+  KB_CONTEXT. Do not treat the words "raise a ticket" in your own answer as a
+  signal to abstain.
+  Worked example -- context says: "Feature X is not supported on platform Y;
+  raise a ticket with Team Z to assess." Question: "Does Feature X work on
+  platform Y?" Correct output: {"answer": "Feature X is not supported on
+  platform Y. Raise a ticket with Team Z to assess.", "citations": ["KB-NNN"],
+  "abstained": false}. This is correct because the KB directly addressed the
+  question, even though the KB's own answer happens to be "it isn't
+  supported, go raise a ticket."
+- "abstained" and "citations" must agree: if you abstain, citations MUST be
+  empty. If you provide any citations, abstained MUST be false. Never return
+  a citation alongside abstained: true, and vice versa.
 - Cite the KB doc_ids you actually relied on in "citations".
 - If any retrieved chunk mentions a P1 / critical-priority escalation phone
   extension, tell the employee to call it rather than only giving a resolution
@@ -66,7 +86,7 @@ def _retrieve(client: OpenAI, question: str) -> list[dict]:
             ORDER BY distance ASC
             LIMIT %s
             """,
-            (q_emb, config.TOP_K),
+            (Vector(q_emb), config.TOP_K),
         )
         rows = cur.fetchall()
         cols = [d.name for d in cur.description]
@@ -103,6 +123,15 @@ def answer(question: str) -> dict:
     result["answer"] = mask_pii(result.get("answer", ""))
     result.setdefault("citations", [])
     result.setdefault("abstained", False)
+
+    # Defensive invariant: the model's own text can be inconsistent (e.g. it
+    # abstains in words but still lists a citation). Citations and abstained
+    # must agree regardless of what the model returned.
+    if result["citations"]:
+        result["abstained"] = False
+    elif result["abstained"]:
+        result["citations"] = []
+
     return result
 
 

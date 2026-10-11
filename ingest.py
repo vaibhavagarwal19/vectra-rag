@@ -18,6 +18,7 @@ import re
 
 import yaml
 from openai import OpenAI
+from pgvector import Vector
 
 import config
 import db
@@ -119,7 +120,7 @@ def ingest_all(kb_dir: str | None = None, wipe_first: bool = True) -> dict:
                     row["effective_date"],
                     row["section"],
                     row["chunk_text"],
-                    emb,
+                    Vector(emb),
                 ),
             )
     summary["chunks"] = len(rows)

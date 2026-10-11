@@ -11,6 +11,6 @@ EMBED_DIM = 1536
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://vectra:vectra@localhost:5433/vectra_rag")
 
 TOP_K = int(os.getenv("TOP_K", "4"))
-SIMILARITY_THRESHOLD = float(os.getenv("SIMILARITY_THRESHOLD", "0.25"))
+SIMILARITY_THRESHOLD = float(os.getenv("SIMILARITY_THRESHOLD", "0.68"))
 
 KB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "knowledge_base")

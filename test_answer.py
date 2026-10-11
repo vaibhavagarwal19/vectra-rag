@@ -8,7 +8,7 @@ import json
 
 from answer import answer
 from pii import EMAIL_RE, PHONE_RE
-from sample_questions import SAMPLE_QUESTIONS, TRICKY_QUESTIONS
+from sample_questions import EDGE_CASE_QUESTIONS, SAMPLE_QUESTIONS, TRICKY_QUESTIONS
 
 
 def _check(case: dict, result: dict) -> dict:
@@ -30,15 +30,19 @@ def _check(case: dict, result: dict) -> dict:
 
 
 def run():
-    all_cases = [(c, False) for c in SAMPLE_QUESTIONS] + [(c, True) for c in TRICKY_QUESTIONS]
+    all_cases = (
+        [(c, "sample") for c in SAMPLE_QUESTIONS]
+        + [(c, "tricky") for c in TRICKY_QUESTIONS]
+        + [(c, "edge_case") for c in EDGE_CASE_QUESTIONS]
+    )
     report = []
-    for case, is_tricky in all_cases:
+    for case, group in all_cases:
         result = answer(case["question"])
         checks = _check(case, result)
         report.append(
             {
                 "question": case["question"],
-                "tricky": is_tricky,
+                "group": group,
                 "note": case.get("note"),
                 "result": result,
                 "checks": checks,

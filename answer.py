@@ -53,7 +53,10 @@ Rules, no exceptions:
 - "abstained" and "citations" must agree: if you abstain, citations MUST be
   empty. If you provide any citations, abstained MUST be false. Never return
   a citation alongside abstained: true, and vice versa.
-- Cite the KB doc_ids you actually relied on in "citations".
+- Cite every KB doc_id you actually relied on in "citations" -- if you pulled
+  a fact from more than one chunk (e.g. one doc says a situation is P1, and a
+  separate ticket-priority doc is what actually gives the escalation phone
+  number for P1), cite all of the doc_ids involved, not just the first one.
 - If any retrieved chunk mentions a P1 / critical-priority escalation phone
   extension, tell the employee to call it rather than only giving a resolution
   time.
@@ -93,7 +96,34 @@ def _retrieve(client: OpenAI, question: str) -> list[dict]:
     return [dict(zip(cols, r)) for r in rows]
 
 
+# KB-003 defines ticket priority (including the P1 "business stopped" definition,
+# the ext. 4357 escalation rule, and the VIP rule) and can apply to almost any
+# ticket. But it's stored as one blended chunk (table + rules together), so a
+# plain-language outage description (e.g. "the warehouse is down, nobody can log
+# in") can score a weak vector-similarity match against it even though KB-003's
+# own wording covers that scenario. Rather than lowering the similarity threshold
+# globally -- which would break the "parking pass" abstain case -- we always pull
+# this one small, cheap, cross-cutting policy doc into context once we've already
+# decided to answer, so the model can't miss the P1/escalation rule just because
+# of embedding distance.
+def _priority_policy_chunks() -> list[dict]:
+    with db.get_conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            "SELECT doc_id, title, section, chunk_text FROM kb_chunks WHERE doc_id = 'KB-003'"
+        )
+        rows = cur.fetchall()
+        cols = [d.name for d in cur.description]
+    return [dict(zip(cols, r)) for r in rows]
+
+
 def answer(question: str) -> dict:
+    if not question or not question.strip():
+        return {
+            "answer": "Please include some detail about your question so I can check the KB. If this is urgent, raise a ticket with the IT service desk.",
+            "citations": [],
+            "abstained": True,
+        }
+
     masked_question = mask_pii(question)
     client = OpenAI(api_key=config.OPENAI_API_KEY)
 
@@ -106,6 +136,11 @@ def answer(question: str) -> dict:
         }
 
     kept = [c for c in chunks if c["distance"] <= config.SIMILARITY_THRESHOLD]
+
+    seen = {(c["doc_id"], c["section"]) for c in kept}
+    for c in _priority_policy_chunks():
+        if (c["doc_id"], c["section"]) not in seen:
+            kept.append(c)
 
     user_prompt = f"KB_CONTEXT:\n{_format_context(kept)}\n\nQUESTION:\n{masked_question}"
 

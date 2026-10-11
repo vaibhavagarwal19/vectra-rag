@@ -1,7 +1,3 @@
-"""The 5 sample questions from the brief, plus a few tricky ones targeting
-known traps in this KB (stale docs, table lookups, conflicting advice,
-a prompt injection planted in the unverified doc)."""
-
 SAMPLE_QUESTIONS = [
     {
         "question": "My account got locked. How long until it unlocks by itself?",
@@ -12,7 +8,6 @@ SAMPLE_QUESTIONS = [
         "question": "What VPN server address should I use when working from home?",
         "expect_citations": ["KB-007"],
         "expect_abstained": False,
-        # that's the stale KB-002 host name -- answering this means we fell for the deprecated doc
         "must_not_contain": ["vpn.vectralogistics.example"],
     },
     {
@@ -83,9 +78,6 @@ TRICKY_QUESTIONS = [
     },
 ]
 
-# Found while testing with the real API key -- exercised directly (see README), not scored by
-# test_answer.py's citation/abstain checks the same way, since a couple of these aren't really
-# "does it cite the right doc" questions. Kept here for anyone re-running the full sweep.
 EDGE_CASE_QUESTIONS = [
     {
         "question": (

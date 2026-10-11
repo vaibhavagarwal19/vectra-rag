@@ -1,9 +1,3 @@
-"""Not a strict pass/fail unit test -- a reporting loop, as the brief asks for:
-'They report results in separate parts: right article retrieved, correct
-abstain, correct citation, nothing unsafe.'
-
-Run with: python test_answer.py
-"""
 import json
 
 from answer import answer

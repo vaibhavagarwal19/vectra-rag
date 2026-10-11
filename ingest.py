@@ -1,17 +1,3 @@
-"""Parse KB markdown files, chunk them, embed each chunk, and store in pgvector.
-
-Chunking strategy:
-  - Each file starts with a YAML front-matter block: doc_id, title, status,
-    effective_date.
-  - The body is split on level-2 headings ("## ..."). Each section becomes one
-    chunk. This keeps the priority table in KB-003 and the error-code table in
-    KB-007 intact -- a size-based splitter could cut either in half.
-  - All 9 articles are short, so if a file has no "## " headings at all
-    (e.g. KB-003), the whole body becomes a single chunk.
-  - Every chunk carries doc_id/title/status/effective_date as metadata columns,
-    not just as text, so queries can filter (e.g. status = 'current') instead
-    of relying on the model to notice a "deprecated" banner in the text.
-"""
 import glob
 import os
 import re
@@ -39,7 +25,6 @@ def parse_kb_file(path: str) -> dict:
 
 
 def split_sections(body: str) -> list[tuple[str, str]]:
-    """Split on '## heading' lines. Returns [(heading, section_text), ...]."""
     lines = body.splitlines()
     sections: list[tuple[str, str]] = []
     current_heading = ""
@@ -54,7 +39,6 @@ def split_sections(body: str) -> list[tuple[str, str]]:
             current_lines.append(line)
     if current_lines:
         sections.append((current_heading, "\n".join(current_lines).strip()))
-    # No "## " headings found at all (e.g. KB-003) -> one chunk for the whole body.
     if not sections:
         sections = [("", body.strip())]
     return sections
@@ -66,7 +50,6 @@ def embed_texts(client: OpenAI, texts: list[str]) -> list[list[float]]:
 
 
 def ingest_all(kb_dir: str | None = None, wipe_first: bool = True) -> dict:
-    """Ingest every KB-*.md file in kb_dir. Returns a small summary dict."""
     kb_dir = kb_dir or config.KB_DIR
     client = OpenAI(api_key=config.OPENAI_API_KEY)
     db.init_schema()

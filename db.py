@@ -1,4 +1,3 @@
-"""Postgres + pgvector connection and schema management."""
 import psycopg
 from pgvector.psycopg import register_vector
 
@@ -36,6 +35,5 @@ def init_schema():
 
 
 def clear_all():
-    """Wipe all chunks -- used before a full re-ingest."""
     with get_conn() as conn:
         conn.execute("TRUNCATE kb_chunks")

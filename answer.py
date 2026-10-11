@@ -1,21 +1,3 @@
-"""The core answer(question) function the brief asks for.
-
-Pipeline:
-  1. Mask PII in the incoming question before it's logged or sent to OpenAI.
-  2. Embed the (masked) question and do a cosine-similarity search against
-     pgvector, restricted to status = 'current' -- this is what stops the
-     deprecated KB-002 VPN doc from ever being retrieved, instead of hoping
-     the model notices a status line in the text. (KB-099 is never even in
-     the table -- see ingest.py.)
-  3. If nothing clears the similarity threshold, abstain immediately --
-     no call to the chat model, no invented answer.
-  4. Otherwise, ask the chat model to answer using ONLY the retrieved
-     chunks, in a fixed JSON shape, citing doc_ids. If KB-003's P1 escalation
-     language is in the retrieved context, the prompt tells the model to
-     surface the phone extension rather than just the SLA number.
-  5. Mask PII again on the way out, defensively, in case the model echoed
-     anything back.
-"""
 import json
 
 from openai import OpenAI
@@ -96,16 +78,6 @@ def _retrieve(client: OpenAI, question: str) -> list[dict]:
     return [dict(zip(cols, r)) for r in rows]
 
 
-# KB-003 defines ticket priority (including the P1 "business stopped" definition,
-# the ext. 4357 escalation rule, and the VIP rule) and can apply to almost any
-# ticket. But it's stored as one blended chunk (table + rules together), so a
-# plain-language outage description (e.g. "the warehouse is down, nobody can log
-# in") can score a weak vector-similarity match against it even though KB-003's
-# own wording covers that scenario. Rather than lowering the similarity threshold
-# globally -- which would break the "parking pass" abstain case -- we always pull
-# this one small, cheap, cross-cutting policy doc into context once we've already
-# decided to answer, so the model can't miss the P1/escalation rule just because
-# of embedding distance.
 def _priority_policy_chunks() -> list[dict]:
     with db.get_conn() as conn, conn.cursor() as cur:
         cur.execute(
@@ -159,9 +131,6 @@ def answer(question: str) -> dict:
     result.setdefault("citations", [])
     result.setdefault("abstained", False)
 
-    # Defensive invariant: the model's own text can be inconsistent (e.g. it
-    # abstains in words but still lists a citation). Citations and abstained
-    # must agree regardless of what the model returned.
     if result["citations"]:
         result["abstained"] = False
     elif result["abstained"]:
